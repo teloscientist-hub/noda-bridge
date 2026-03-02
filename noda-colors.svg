@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="590" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+
+  <!-- Background -->
+  <rect width="480" height="590" fill="#1a1a1a" rx="12"/>
+
+  <!-- Title -->
+  <text x="20" y="36" fill="#ffffff" font-size="15" font-weight="600" letter-spacing="1">NODA COLOR PALETTE</text>
+  <line x1="20" y1="46" x2="460" y2="46" stroke="#333333" stroke-width="1"/>
+
+  <!-- Row 1: #6C2231  dark crimson -->
+  <rect x="20"  y="60"  width="66" height="48" rx="6" fill="#6C2231"/>
+  <text x="100" y="80"  fill="#ffffff" font-size="16" font-weight="700" font-family="monospace">#6C2231</text>
+  <text x="100" y="98"  fill="#888888" font-size="12">Dark Crimson</text>
+
+  <!-- Row 2: #F44336  red -->
+  <rect x="20"  y="122" width="66" height="48" rx="6" fill="#F44336"/>
+  <text x="100" y="142" fill="#ffffff" font-size="16" font-weight="700" font-family="monospace">#F44336</text>
+  <text x="100" y="160" fill="#888888" font-size="12">Red</text>
+
+  <!-- Row 3: #FF9800  orange -->
+  <rect x="20"  y="184" width="66" height="48" rx="6" fill="#FF9800"/>
+  <text x="100" y="204" fill="#ffffff" font-size="16" font-weight="700" font-family="monospace">#FF9800</text>
+  <text x="100" y="222" fill="#888888" font-size="12">Orange</text>
+
+  <!-- Row 4: #9C27B0  purple -->
+  <rect x="20"  y="246" width="66" height="48" rx="6" fill="#9C27B0"/>
+  <text x="100" y="266" fill="#ffffff" font-size="16" font-weight="700" font-family="monospace">#9C27B0</text>
+  <text x="100" y="284" fill="#888888" font-size="12">Purple</text>
+
+  <!-- Row 5: #673AB7  deep purple -->
+  <rect x="20"  y="308" width="66" height="48" rx="6" fill="#673AB7"/>
+  <text x="100" y="328" fill="#ffffff" font-size="16" font-weight="700" font-family="monospace">#673AB7</text>
+  <text x="100" y="346" fill="#888888" font-size="12">Deep Purple</text>
+
+  <!-- Row 6: #009688  teal (assumed from "9688") -->
+  <rect x="20"  y="370" width="66" height="48" rx="6" fill="#009688"/>
+  <text x="100" y="390" fill="#ffffff" font-size="16" font-weight="700" font-family="monospace">#009688</text>
+  <text x="100" y="408" fill="#888888" font-size="12">Teal  (entered as "9688" — assumed #009688)</text>
+
+  <!-- Row 7: #606060  gray -->
+  <rect x="20"  y="432" width="66" height="48" rx="6" fill="#606060"/>
+  <text x="100" y="452" fill="#ffffff" font-size="16" font-weight="700" font-family="monospace">#606060</text>
+  <text x="100" y="470" fill="#888888" font-size="12">Gray</text>
+
+  <!-- Row 8: #3F51B5  indigo -->
+  <rect x="20"  y="494" width="66" height="48" rx="6" fill="#3F51B5"/>
+  <text x="100" y="514" fill="#ffffff" font-size="16" font-weight="700" font-family="monospace">#3F51B5</text>
+  <text x="100" y="532" fill="#888888" font-size="12">Indigo</text>
+
+  <!-- Row 9: #FFEB3B  yellow — dark text for contrast -->
+  <rect x="20"  y="556" width="66" height="48" rx="6" fill="#FFEB3B"/>
+  <text x="100" y="576" fill="#1a1a1a" font-size="16" font-weight="700" font-family="monospace">#FFEB3B</text>
+  <text x="100" y="594" fill="#888888" font-size="12">Yellow</text>
+
+</svg>
