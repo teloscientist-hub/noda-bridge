@@ -1041,34 +1041,99 @@ async function pushToNoda() {
   if (!cuHierarchy) { alert('Fetch from ClickUp first'); return; }
   if (!window.noda) { alert('Not connected to NODA'); return; }
   setSyncStatus('Pushing to NODA…');
-  let created = 0, skipped = 0;
   try {
-    const existing = await nodaListNodes();
-    const existingIds = new Set(
-      existing.map(n => extractClickUpId(n.notes)).filter(Boolean)
-    );
+    // Pre-load existing nodes and links
+    const existingNodes = await nodaListNodes();
+    const existingLinks = await nodaListLinks();
 
-    async function processTasks(tasks, listName, folderName) {
-      for (const task of tasks) {
-        if (existingIds.has(task.id)) { skipped++; continue; }
-        const props = clickupTaskToNodaNode(task, listName, folderName);
-        await nodaCreateNode(props);
-        created++;
-      }
+    // clickupId → noda uuid (for dedup + link resolution)
+    const cuIdToUuid = {};
+    for (const node of existingNodes) {
+      const cuId = extractClickUpId(node.notes);
+      if (cuId) cuIdToUuid[cuId] = node.uuid;
     }
+
+    // existing link pairs to avoid exact duplicates
+    const linkSet = new Set(existingLinks.map(l => `${l.fromUuid}:${l.toUuid}`));
+
+    let nodesCreated = 0, linksCreated = 0;
+    const linkPairs = []; // { fromCuId, toCuId } collected during pass 1
+
+    async function getOrCreateNode(cuId, props) {
+      if (cuIdToUuid[cuId]) return cuIdToUuid[cuId];
+      const node = await nodaCreateNode(props);
+      cuIdToUuid[cuId] = node.uuid;
+      nodesCreated++;
+      return node.uuid;
+    }
+
+    // ── Pass 1: create all nodes ──────────────────────────
+    const spaceId   = document.getElementById('cu-space').value;
+    const spaceName = document.getElementById('cu-space').selectedOptions[0]?.text || 'Space';
+
+    await getOrCreateNode(`space_${spaceId}`, {
+      title: spaceName, notes: `[ClickUp ID: space_${spaceId}]`,
+      shape: 'Ball', size: 15, color: '#58a6ff',
+    });
 
     for (const folder of cuHierarchy.folders) {
+      await getOrCreateNode(`folder_${folder.id}`, {
+        title: folder.name, notes: `[ClickUp ID: folder_${folder.id}]`,
+        shape: 'Box', size: 10, color: '#58a6ff',
+      });
+      linkPairs.push({ fromCuId: `space_${spaceId}`, toCuId: `folder_${folder.id}` });
+
       for (const list of folder.lists) {
-        await processTasks(list.tasks, list.name, folder.name);
+        await getOrCreateNode(`list_${list.id}`, {
+          title: list.name, notes: `[ClickUp ID: list_${list.id}]`,
+          shape: 'Ball', size: 7, color: '#58a6ff',
+        });
+        linkPairs.push({ fromCuId: `folder_${folder.id}`, toCuId: `list_${list.id}` });
+
+        for (const task of list.tasks || []) {
+          await getOrCreateNode(task.id, clickupTaskToNodaNode(task));
+          if (task.parent) {
+            linkPairs.push({ fromCuId: task.parent, toCuId: task.id });
+          } else {
+            linkPairs.push({ fromCuId: `list_${list.id}`, toCuId: task.id });
+          }
+        }
       }
     }
+
     for (const list of cuHierarchy.folderlessLists) {
-      await processTasks(list.tasks, list.name, '');
+      await getOrCreateNode(`list_${list.id}`, {
+        title: list.name, notes: `[ClickUp ID: list_${list.id}]`,
+        shape: 'Ball', size: 7, color: '#58a6ff',
+      });
+      linkPairs.push({ fromCuId: `space_${spaceId}`, toCuId: `list_${list.id}` });
+
+      for (const task of list.tasks || []) {
+        await getOrCreateNode(task.id, clickupTaskToNodaNode(task));
+        if (task.parent) {
+          linkPairs.push({ fromCuId: task.parent, toCuId: task.id });
+        } else {
+          linkPairs.push({ fromCuId: `list_${list.id}`, toCuId: task.id });
+        }
+      }
+    }
+
+    // ── Pass 2: create all links ──────────────────────────
+    for (const { fromCuId, toCuId } of linkPairs) {
+      const fromUuid = cuIdToUuid[fromCuId];
+      const toUuid   = cuIdToUuid[toCuId];
+      if (!fromUuid || !toUuid) continue;
+      const key = `${fromUuid}:${toUuid}`;
+      if (linkSet.has(key)) continue;
+      await nodaCreateLink({ fromUuid, toUuid });
+      linkSet.add(key);
+      linksCreated++;
     }
 
     await refreshNodesTable();
-    appendLog(`Pushed to NODA: ${created} created, ${skipped} skipped (already exist)`, 'ok');
-    setSyncStatus(`Done — ${created} nodes created`);
+    await refreshLinksTable();
+    appendLog(`Pushed to NODA: ${nodesCreated} nodes, ${linksCreated} links created`, 'ok');
+    setSyncStatus(`Done — ${nodesCreated} nodes, ${linksCreated} links`);
   } catch (e) {
     appendLog(e.message, 'err');
     setSyncStatus('Error: ' + e.message);
