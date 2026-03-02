@@ -836,7 +836,7 @@ async function cuGetSpaces(teamId)    { return cuFetch(`/team/${teamId}/space?ar
 async function cuGetFolders(spaceId)  { return cuFetch(`/space/${spaceId}/folder?archived=false`); }
 async function cuGetLists(folderId)   { return cuFetch(`/folder/${folderId}/list?archived=false`); }
 async function cuGetFolderlessLists(spaceId) { return cuFetch(`/space/${spaceId}/list?archived=false`); }
-async function cuGetTasks(listId)     { return cuFetch(`/list/${listId}/task?include_closed=true`); }
+async function cuGetTasks(listId)     { return cuFetch(`/list/${listId}/task?include_closed=true&subtasks=true&custom_fields=true`); }
 async function cuUpdateTask(taskId, body) { return cuFetch(`/task/${taskId}`, { method: 'PUT', body: JSON.stringify(body) }); }
 
 // ── Settings: load workspaces / spaces ──────────────────
@@ -884,19 +884,93 @@ window.addEventListener('DOMContentLoaded', () => {
 // ── Transformation Scaffold ──────────────────────────────
 // Phase 2: Replace these with the user-provided mapping document.
 
-function clickupTaskToNodaNode(task, listName, folderName) {
+// ── Custom field extractors ──────────────────────────────
+function getCustomFieldDropdown(task, name) {
+  const cf = (task.custom_fields || []).find(f => f.name === name);
+  if (!cf || cf.value === null || cf.value === undefined) return null;
+  const opts = (cf.type_config && cf.type_config.options) || [];
+  const opt = opts.find(o => o.orderindex === cf.value);
+  return opt ? opt.name : null;
+}
+
+function getCustomFieldLabels(task, name) {
+  const cf = (task.custom_fields || []).find(f => f.name === name);
+  if (!cf || !Array.isArray(cf.value)) return [];
+  return cf.value.map(v => v.label || v.name || '').filter(Boolean);
+}
+
+// ── Field mappers ────────────────────────────────────────
+function urgencyToColor(urgency) {
+  const map = {
+    'FIRST':     '#FFEB3B',
+    'Now':       '#6C2231',
+    'Next':      '#F44336',
+    'After':     '#FF9800',
+    'Recurring': '#009688',
+    'Soon':      '#3F51B5',
+    'Coming':    '#9C27B0',
+    'Future':    '#673AB7',
+    'Archived':  '#606060',
+  };
+  return map[urgency] || '#606060';
+}
+
+function typeToShape(types) {
+  const map = {
+    'Inbox':    'Ball',
+    'Person':   'Box',
+    'Practice': 'Tetra',
+    'Research': 'Cylinder',
+    'Delegate': 'Diamond',
+    'Mindset':  'Hourglass',
+    'Action':   'Plus',
+    'Project':  'Star',
+  };
+  return map[(types || [])[0]] || 'Ball';
+}
+
+function impactToSize(impact) {
+  const map = {
+    '0 BOOM!': 45,
+    '1 Top':   40,
+    '2 Top':   25,
+    '3 Top':   30,
+    '4 High':  25,
+    '5 High':  20,
+    '6 Med':   15,
+    '7 Low':   10,
+    '8 Maybe':  5,
+    '9 Meh':    2.5,
+  };
+  return map[impact] || 5;
+}
+
+function timeEstimateToOpacity(ms) {
+  if (!ms) return 0.2;
+  const min = ms / 60000;
+  if (min < 16)  return 0.2;
+  if (min < 31)  return 0.4;
+  if (min < 61)  return 0.6;
+  if (min < 181) return 0.8;
+  return 1.0;
+}
+
+// ── Transformation functions ─────────────────────────────
+function clickupTaskToNodaNode(task) {
+  const urgency = getCustomFieldDropdown(task, 'Urgency');
+  const impact  = getCustomFieldDropdown(task, 'Impact');
+  const types   = getCustomFieldLabels(task, 'Type');
   return {
     title:   task.name,
     notes:   [
       task.description ? task.description.substring(0, 300) : '',
       `[ClickUp ID: ${task.id}]`
     ].filter(Boolean).join('\n'),
-    color:   statusToColor(task.status?.status),
-    shape:   priorityToShape(task.priority?.priority),
-    size:    5,
+    color:   urgencyToColor(urgency),
+    opacity: timeEstimateToOpacity(task.time_estimate),
+    shape:   typeToShape(types),
+    size:    impactToSize(impact),
     pageUrl: task.url,
-    // Store ClickUp task ID for reverse sync
-    // We embed it in notes for now; Phase 2 may use a dedicated field
   };
 }
 
@@ -905,24 +979,6 @@ function nodaNodeToClickupTask(node) {
     name:        node.title,
     description: extractDescription(node.notes),
   };
-}
-
-// ── Helper mappers (Phase 2: replace with real mappings) ─
-function statusToColor(status) {
-  const map = {
-    'to do':        '#8b949e',
-    'in progress':  '#58a6ff',
-    'done':         '#3fb950',
-    'closed':       '#3fb950',
-    'complete':     '#3fb950',
-    'blocked':      '#f85149',
-  };
-  return map[(status || '').toLowerCase()] || '#58a6ff';
-}
-
-function priorityToShape(priority) {
-  const map = { urgent: 'Star', high: 'Diamond', normal: 'Ball', low: 'Box' };
-  return map[(priority || '').toLowerCase()] || 'Ball';
 }
 
 function extractDescription(notes) {
