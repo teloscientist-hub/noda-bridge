@@ -53,3 +53,38 @@ Links,Event,onLinkDeleted(link),callback,—,Fires when a link is deleted from i
 ,,,,,,,,,,,
 USER,,,,,,,,,,,
 User,Operation,getUser(),function,—,Returns { userId } — unique per NODA installation,Read-only,,,,,
+,,,,,,,,,,,
+CLICKUP — Standard Task Fields (for mapping reference),,,,,,,,,,,
+ClickUp,Field,task.id,string,—,Unique task identifier,Read-only,Task,id,—,—,Use to track ClickUp↔NODA link (embed in NODA notes)
+ClickUp,Field,task.name,string,—,Task title,Both,Task,name,—,direct copy,Maps to NODA title
+ClickUp,Field,task.description,string,—,Task body text,Both,Task,description,—,direct copy,Maps to NODA notes
+ClickUp,Field,task.status.status,string,—,Current task status,Both,Task,status.status,—,lookup → NODA color,See status→color lookup below
+ClickUp,Field,task.priority.priority,string,"urgent, high, normal, low",Task priority level,Both,Task,priority.priority,"urgent, high, normal, low",lookup → NODA shape,See priority→shape lookup below
+ClickUp,Field,task.assignees,array,—,List of assigned users,Both,Task,assignees,[{id username email}],join usernames,Map to NODA notes or ignore
+ClickUp,Field,task.due_date,timestamp,milliseconds,Due date,Both,Task,due_date,—,embed in NODA notes,No direct NODA equivalent
+ClickUp,Field,task.start_date,timestamp,milliseconds,Start date,Both,Task,start_date,—,embed in NODA notes,No direct NODA equivalent
+ClickUp,Field,task.tags,array,—,Tag names,Both,Task,tags,[{name}],join names,Embed in NODA notes
+ClickUp,Field,task.url,URL,—,Direct link to task in ClickUp,ClickUp → NODA,Task,url,—,direct copy,Maps to NODA pageUrl
+ClickUp,Field,task.parent,string,—,Parent task ID (if subtask),Read-only,Task,parent,—,—,Use to create NODA links between nodes
+ClickUp,Field,task.time_estimate,number,milliseconds,Estimated time,Both,Task,time_estimate,—,embed in NODA notes,No direct NODA equivalent
+ClickUp,Field,task.time_spent,number,milliseconds,Tracked time,Read-only,Task,time_spent,—,embed in NODA notes,No direct NODA equivalent
+,,,,,,,,,,,
+CLICKUP — Custom Fields (found in primary workspace),,,,,,,,,,,
+ClickUp,Custom Field,custom_fields[Domain],drop_down,"Mind, Life, BPC, PLA, GoHM, MML, ARH, CTP, HTI",Project domain / area of life,Both,Task,custom_fields[Domain],"Mind, Life, BPC, PLA, GoHM, MML, ARH, CTP, HTI",,Map to NODA color or shape per domain
+ClickUp,Custom Field,custom_fields[Impact],drop_down,"BOOM!, 1 Top, 2 Top, 3 Top, 4 High, 5 High, 6 Med, 7 Low, 8 Maybe, 9 Meh",Impact/priority rating,Both,Task,custom_fields[Impact],"BOOM! 1 Top 2 Top 3 Top 4 High 5 High 6 Med 7 Low 8 Maybe 9 Meh",,Map to NODA size or color
+ClickUp,Custom Field,custom_fields[Type],labels,"Inbox, Game Mindset, Project, Practice, Action, Research, Delegate, Person, Recurring, Template",Task type labels (multi-select),Both,Task,custom_fields[Type],"Inbox, Game Mindset, Project, Practice, Action, Research, Delegate, Person, Recurring, Template",,Map to NODA shape per type
+ClickUp,Custom Field,custom_fields[Urgency],drop_down,"FIRST, Now, Next, After, Recurring, Soon, Coming, Future, Archived",Urgency / time horizon,Both,Task,custom_fields[Urgency],"FIRST, Now, Next, After, Recurring, Soon, Coming, Future, Archived",,Map to NODA color per urgency
+,,,,,,,,,,,
+CLICKUP — Status → NODA Color Lookup (default scaffold),,,,,,,,,,,
+ClickUp,Lookup,status: to do,—,—,—,ClickUp → NODA,—,—,—,→ NODA color #8b949e,Gray
+ClickUp,Lookup,status: in progress,—,—,—,ClickUp → NODA,—,—,—,→ NODA color #58a6ff,Blue
+ClickUp,Lookup,status: done / closed,—,—,—,ClickUp → NODA,—,—,—,→ NODA color #3fb950,Green
+ClickUp,Lookup,status: blocked,—,—,—,ClickUp → NODA,—,—,—,→ NODA color #f85149,Red
+ClickUp,Lookup,status: ---,—,—,—,ClickUp → NODA,—,—,—,→ NODA color #58a6ff,Default blue
+,,,,,,,,,,,
+CLICKUP — Priority → NODA Shape Lookup (default scaffold),,,,,,,,,,,
+ClickUp,Lookup,priority: urgent,—,—,—,ClickUp → NODA,—,—,—,→ NODA shape Star,
+ClickUp,Lookup,priority: high,—,—,—,ClickUp → NODA,—,—,—,→ NODA shape Diamond,
+ClickUp,Lookup,priority: normal,—,—,—,ClickUp → NODA,—,—,—,→ NODA shape Ball,
+ClickUp,Lookup,priority: low,—,—,—,ClickUp → NODA,—,—,—,→ NODA shape Box,
+ClickUp,Lookup,priority: none,—,—,—,ClickUp → NODA,—,—,—,→ NODA shape Ball,Default
