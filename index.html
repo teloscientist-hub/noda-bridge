@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NODA Bridge</title>
+  <script src="https://noda.io/api/includes/noda.js"></script>
+  <style>
+    :root {
+      --bg:      #0d1117;
+      --surface: #161b22;
+      --surface2:#1c2128;
+      --border:  #30363d;
+      --accent:  #58a6ff;
+      --text:    #e6edf3;
+      --muted:   #8b949e;
+      --success: #3fb950;
+      --error:   #f85149;
+      --warn:    #d29922;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 13px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Status Bar ─────────────────────────────────────── */
+    #status-bar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 6px 14px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+    #status-bar .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--warn);
+      flex-shrink: 0;
+    }
+    #status-bar .dot.connected { background: var(--success); }
+    #status-bar .dot.error     { background: var(--error); }
+    #noda-status  { font-weight: 600; }
+    #user-id      { color: var(--muted); font-size: 11px; }
+    #event-log    {
+      margin-left: auto;
+      color: var(--muted);
+      font-size: 11px;
+      font-family: monospace;
+      max-width: 420px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* ── Tabs ───────────────────────────────────────────── */
+    #tab-bar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 2px;
+      padding: 0 10px;
+      flex-shrink: 0;
+    }
+    .tab-btn {
+      padding: 8px 16px;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 13px;
+      transition: color .15s, border-color .15s;
+    }
+    .tab-btn:hover   { color: var(--text); }
+    .tab-btn.active  { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* ── Main Content ───────────────────────────────────── */
+    #main {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .tab-panel {
+      display: none;
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+    }
+    .tab-panel.active { display: flex; flex-direction: column; gap: 14px; }
+
+    /* ── Cards / Sections ───────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px;
+    }
+    .card h3 {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: var(--text);
+    }
+
+    /* ── Form Controls ──────────────────────────────────── */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 10px;
+    }
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+    .form-group label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text);
+      padding: 6px 8px;
+      font-size: 13px;
+      width: 100%;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .form-group textarea { resize: vertical; min-height: 60px; }
+    .form-group.full-width { grid-column: 1 / -1; }
+    .form-group input[type="color"] { padding: 2px 4px; height: 32px; cursor: pointer; }
+    .form-group input[type="checkbox"] { width: auto; }
+    .checkbox-row { flex-direction: row; align-items: center; gap: 8px; }
+    .form-actions { display: flex; gap: 8px; margin-top: 12px; }
+
+    /* ── Buttons ────────────────────────────────────────── */
+    .btn {
+      padding: 6px 14px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: opacity .15s;
+    }
+    .btn:hover { opacity: .8; }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); border-color: var(--accent); color: #000; }
+    .btn-danger  { background: var(--error);  border-color: var(--error);  color: #fff; }
+    .btn-ghost   { background: transparent; color: var(--text); }
+    .btn-sm      { padding: 3px 9px; font-size: 11px; }
+
+    /* ── Tables ─────────────────────────────────────────── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th {
+      text-align: left;
+      padding: 7px 10px;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 10px;
+      letter-spacing: .5px;
+    }
+    td {
+      padding: 7px 10px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--surface2); }
+    .color-swatch {
+      display: inline-block;
+      width: 12px; height: 12px;
+      border-radius: 2px;
+      border: 1px solid var(--border);
+      vertical-align: middle;
+      margin-right: 5px;
+    }
+    .uuid-cell { font-family: monospace; font-size: 10px; color: var(--muted); max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .notes-cell { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+    .actions-cell { white-space: nowrap; }
+    .no-data { text-align: center; padding: 24px; color: var(--muted); }
+
+    /* ── ClickUp Tree ───────────────────────────────────── */
+    .tree { list-style: none; padding-left: 0; }
+    .tree .tree { padding-left: 16px; }
+    .tree-item {
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tree-item:hover { background: var(--surface2); }
+    .tree-item .toggle { color: var(--muted); font-size: 10px; width: 12px; }
+    .tree-item .item-name { flex: 1; }
+    .tree-item .item-count { font-size: 10px; color: var(--muted); }
+    .tree-children { display: none; }
+    .tree-children.open { display: block; }
+
+    /* ── Sync Log ───────────────────────────────────────── */
+    #sync-log {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 8px;
+      height: 140px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 11px;
+    }
+    .log-entry { padding: 2px 0; border-bottom: 1px solid var(--border); }
+    .log-entry:last-child { border-bottom: none; }
+    .log-ts { color: var(--muted); margin-right: 8px; }
+    .log-ok  { color: var(--success); }
+    .log-err { color: var(--error); }
+    .log-info{ color: var(--accent); }
+
+    /* ── Misc ───────────────────────────────────────────── */
+    .row-actions { display: flex; gap: 4px; }
+    .inline-badge {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 10px;
+      font-size: 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════
+     STATUS BAR
+══════════════════════════════════════════════════════ -->
+<div id="status-bar">
+  <div class="dot" id="noda-dot"></div>
+  <span id="noda-status">Connecting to NODA…</span>
+  <span id="user-id"></span>
+  <span id="event-log">—</span>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     TAB BAR
+══════════════════════════════════════════════════════ -->
+<div id="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('settings')">⚙ Settings</button>
+  <button class="tab-btn"        onclick="switchTab('nodes')">Nodes</button>
+  <button class="tab-btn"        onclick="switchTab('links')">Links</button>
+  <button class="tab-btn"        onclick="switchTab('sync')">ClickUp Sync</button>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     MAIN
+══════════════════════════════════════════════════════ -->
+<div id="main">
+
+  <!-- ── SETTINGS ─────────────────────────────────────── -->
+  <div id="tab-settings" class="tab-panel active">
+    <div class="card">
+      <h3>ClickUp Connection</h3>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>ClickUp API Token</label>
+          <input type="password" id="cu-token" placeholder="pk_…" autocomplete="off" />
+        </div>
+        <div class="form-group" style="align-self:flex-end;">
+          <button class="btn btn-primary" onclick="saveToken()">Load Workspaces</button>
+        </div>
+      </div>
+      <div class="form-grid" style="margin-top:10px;">
+        <div class="form-group">
+          <label>Workspace (Team)</label>
+          <select id="cu-team" onchange="loadSpaces()">
+            <option value="">— select —</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Space</label>
+          <select id="cu-space">
+            <option value="">— select —</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Auto-Sync</h3>
+      <div class="form-grid">
+        <div class="form-group checkbox-row">
+          <label>Enable auto-sync</label>
+          <input type="checkbox" id="auto-sync-toggle" onchange="toggleAutoSync()" />
+        </div>
+        <div class="form-group">
+          <label>Interval</label>
+          <select id="sync-interval">
+            <option value="30000">30 seconds</option>
+            <option value="60000" selected>1 minute</option>
+            <option value="300000">5 minutes</option>
+          </select>
+        </div>
+      </div>
+      <p id="autosync-status" style="margin-top:8px; font-size:11px; color:var(--muted);">Auto-sync off</p>
+    </div>
+  </div>
+
+  <!-- ── NODES ─────────────────────────────────────────── -->
+  <div id="tab-nodes" class="tab-panel">
+
+    <!-- Create / Edit Form -->
+    <div class="card" id="node-form-card">
+      <h3 id="node-form-title">New Node</h3>
+      <input type="hidden" id="node-uuid" />
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Title</label>
+          <input type="text" id="node-title" placeholder="Node title" />
+        </div>
+        <div class="form-group">
+          <label>Shape</label>
+          <select id="node-shape">
+            <option>Ball</option><option>Box</option><option>Tetra</option>
+            <option>Cylinder</option><option>Diamond</option>
+            <option>Hourglass</option><option>Plus</option><option>Star</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Color</label>
+          <input type="color" id="node-color" value="#58a6ff" />
+        </div>
+        <div class="form-group">
+          <label>Size (1–45)</label>
+          <input type="number" id="node-size" value="5" min="1" max="45" />
+        </div>
+        <div class="form-group">
+          <label>Opacity (0–1)</label>
+          <input type="number" id="node-opacity" value="1" min="0" max="1" step="0.1" />
+        </div>
+        <div class="form-group">
+          <label>Page URL</label>
+          <input type="url" id="node-pageUrl" placeholder="https://…" />
+        </div>
+        <div class="form-group">
+          <label>Image URL (.png/.jpg)</label>
+          <input type="url" id="node-imageUrl" placeholder="https://…" />
+        </div>
+        <div class="form-group full-width">
+          <label>Notes</label>
+          <textarea id="node-notes" placeholder="Additional information…"></textarea>
+        </div>
+        <div class="form-group checkbox-row">
+          <label>Selected</label>
+          <input type="checkbox" id="node-selected" />
+        </div>
+        <div class="form-group checkbox-row">
+          <label>Collapsed</label>
+          <input type="checkbox" id="node-collapsed" />
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="submitNodeForm()">Save Node</button>
+        <button class="btn btn-ghost"   onclick="clearNodeForm()">Clear</button>
+      </div>
+    </div>
+
+    <!-- Nodes Table -->
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <h3>Nodes <span id="node-count" class="inline-badge">0</span></h3>
+        <button class="btn btn-ghost btn-sm" onclick="refreshNodesTable()">↻ Refresh</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>UUID</th><th>Title</th><th>Shape</th>
+              <th>Color</th><th>Size</th><th>Notes</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="nodes-tbody">
+            <tr><td colspan="7" class="no-data">Not connected to NODA</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── LINKS ─────────────────────────────────────────── -->
+  <div id="tab-links" class="tab-panel">
+
+    <!-- Create / Edit Form -->
+    <div class="card">
+      <h3 id="link-form-title">New Link</h3>
+      <input type="hidden" id="link-uuid" />
+      <div class="form-grid">
+        <div class="form-group">
+          <label>From Node</label>
+          <select id="link-from">
+            <option value="">— select node —</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>To Node</label>
+          <select id="link-to">
+            <option value="">— select node —</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Title</label>
+          <input type="text" id="link-title" placeholder="Link label" />
+        </div>
+        <div class="form-group">
+          <label>Color</label>
+          <input type="color" id="link-color" value="#58a6ff" />
+        </div>
+        <div class="form-group">
+          <label>Shape</label>
+          <select id="link-shape">
+            <option>Solid</option><option>Dash</option><option>Arrows</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Size (1–10)</label>
+          <input type="number" id="link-size" value="1" min="1" max="10" />
+        </div>
+        <div class="form-group">
+          <label>Curve</label>
+          <select id="link-curve">
+            <option value="none">None</option>
+            <option value="cdown">C Down</option><option value="cup">C Up</option>
+            <option value="sdown">S Down</option><option value="sup">S Up</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Trail</label>
+          <select id="link-trail">
+            <option value="none">None</option>
+            <option value="ring">Ring</option>
+            <option value="ball">Ball</option><option value="cone">Cone</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="submitLinkForm()">Save Link</button>
+        <button class="btn btn-ghost"   onclick="clearLinkForm()">Clear</button>
+      </div>
+    </div>
+
+    <!-- Links Table -->
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <h3>Links <span id="link-count" class="inline-badge">0</span></h3>
+        <button class="btn btn-ghost btn-sm" onclick="refreshLinksTable()">↻ Refresh</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>UUID</th><th>From</th><th>To</th>
+              <th>Title</th><th>Shape</th><th>Size</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="links-tbody">
+            <tr><td colspan="7" class="no-data">Not connected to NODA</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CLICKUP SYNC ──────────────────────────────────── -->
+  <div id="tab-sync" class="tab-panel">
+
+    <div class="card">
+      <h3>Sync Controls</h3>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="fetchFromClickUp()">↓ Fetch from ClickUp</button>
+        <button class="btn btn-primary" onclick="pushToNoda()">→ Push to NODA</button>
+        <button class="btn btn-ghost"   onclick="pushToClickUp()">↑ Push changes to ClickUp</button>
+        <button class="btn btn-ghost btn-sm" onclick="clearSyncLog()" style="margin-left:auto;">Clear log</button>
+      </div>
+      <p id="sync-status" style="margin-top:8px; font-size:11px; color:var(--muted);">Ready</p>
+    </div>
+
+    <div class="card" style="flex:1; min-height:0; display:flex; flex-direction:column;">
+      <h3>ClickUp Hierarchy</h3>
+      <ul class="tree" id="cu-tree">
+        <li style="color:var(--muted); padding:8px;">Select a Space in Settings first</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Sync Log</h3>
+      <div id="sync-log"></div>
+    </div>
+  </div>
+
+</div><!-- #main -->
+
+<script>
+// ════════════════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════════════════
+let nodesCache = [];       // current NODA nodes
+let linksCache = [];       // current NODA links
+let cuHierarchy = null;    // fetched ClickUp data
+let autoSyncTimer = null;
+
+// ════════════════════════════════════════════════════════
+//  NODA INIT
+// ════════════════════════════════════════════════════════
+if (window.noda) {
+  window.noda.onInitialized = async () => {
+    setNodaStatus(true);
+    try {
+      const user = await window.noda.getUser();
+      document.getElementById('user-id').textContent = `User: ${user.userId}`;
+    } catch (_) {}
+    await refreshNodesTable();
+    await refreshLinksTable();
+    const toggle = document.getElementById('auto-sync-toggle');
+    if (toggle.checked) startAutoSync();
+  };
+
+  // Live event handlers
+  window.noda.onNodeCreated = (n) => { upsertNodeRow(n); updateNodeSelects(); logEvent(`Node created: ${n.title}`); };
+  window.noda.onNodeUpdated = (n) => { upsertNodeRow(n); updateNodeSelects(); logEvent(`Node updated: ${n.title}`); };
+  window.noda.onNodeDeleted = (n) => { removeNodeRow(n.uuid); updateNodeSelects(); logEvent(`Node deleted: ${n.uuid}`); };
+  window.noda.onLinkCreated = (l) => { upsertLinkRow(l); logEvent(`Link created: ${l.uuid}`); };
+  window.noda.onLinkUpdated = (l) => { upsertLinkRow(l); logEvent(`Link updated: ${l.uuid}`); };
+  window.noda.onLinkDeleted = (l) => { removeLinkRow(l.uuid); logEvent(`Link deleted: ${l.uuid}`); };
+} else {
+  setNodaStatus(false, 'noda.js not available (open in NODA browser)');
+}
+
+function setNodaStatus(ok, msg) {
+  const dot = document.getElementById('noda-dot');
+  const status = document.getElementById('noda-status');
+  dot.className = 'dot ' + (ok ? 'connected' : 'error');
+  status.textContent = ok ? 'NODA connected' : (msg || 'NODA disconnected');
+}
+
+function logEvent(msg) {
+  document.getElementById('event-log').textContent = msg;
+}
+
+// ════════════════════════════════════════════════════════
+//  NODA CRUD WRAPPERS
+// ════════════════════════════════════════════════════════
+async function nodaCreateNode(props) { return await window.noda.createNode(props); }
+async function nodaUpdateNode(props) { return await window.noda.updateNode(props); }
+async function nodaDeleteNode(uuid)  { return await window.noda.deleteNode({ uuid }); }
+async function nodaListNodes()       { return await window.noda.listNodes(null); }
+async function nodaCreateLink(props) { return await window.noda.createLink(props); }
+async function nodaUpdateLink(props) { return await window.noda.updateLink(props); }
+async function nodaDeleteLink(uuid)  { return await window.noda.deleteLink({ uuid }); }
+async function nodaListLinks()       { return await window.noda.listLinks(null); }
+
+// ════════════════════════════════════════════════════════
+//  NODES TABLE
+// ════════════════════════════════════════════════════════
+async function refreshNodesTable() {
+  if (!window.noda) return;
+  try {
+    const nodes = await nodaListNodes();
+    nodesCache = nodes || [];
+    renderNodesTable(nodesCache);
+    updateNodeSelects();
+  } catch (e) { console.error(e); }
+}
+
+function renderNodesTable(nodes) {
+  const tbody = document.getElementById('nodes-tbody');
+  document.getElementById('node-count').textContent = nodes.length;
+  if (!nodes.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="no-data">No nodes yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = nodes.map(n => `
+    <tr id="node-row-${n.uuid}">
+      <td class="uuid-cell" title="${n.uuid}">${n.uuid}</td>
+      <td>${esc(n.title || '')}</td>
+      <td>${esc(n.shape || '')}</td>
+      <td><span class="color-swatch" style="background:${n.color||'#888'}"></span>${esc(n.color||'')}</td>
+      <td>${n.size ?? ''}</td>
+      <td class="notes-cell" title="${esc(n.notes||'')}">${esc(n.notes||'')}</td>
+      <td class="actions-cell">
+        <div class="row-actions">
+          <button class="btn btn-ghost btn-sm" onclick="editNode('${n.uuid}')">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteNodeById('${n.uuid}')">Del</button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function upsertNodeRow(node) {
+  const idx = nodesCache.findIndex(n => n.uuid === node.uuid);
+  if (idx >= 0) nodesCache[idx] = node; else nodesCache.push(node);
+  renderNodesTable(nodesCache);
+}
+function removeNodeRow(uuid) {
+  nodesCache = nodesCache.filter(n => n.uuid !== uuid);
+  renderNodesTable(nodesCache);
+}
+
+function updateNodeSelects() {
+  ['link-from', 'link-to'].forEach(id => {
+    const sel = document.getElementById(id);
+    const val = sel.value;
+    sel.innerHTML = '<option value="">— select node —</option>' +
+      nodesCache.map(n => `<option value="${n.uuid}">${esc(n.title||n.uuid)}</option>`).join('');
+    sel.value = val;
+  });
+}
+
+// Node form
+function editNode(uuid) {
+  const node = nodesCache.find(n => n.uuid === uuid);
+  if (!node) return;
+  switchTab('nodes');
+  document.getElementById('node-form-title').textContent = 'Edit Node';
+  document.getElementById('node-uuid').value     = node.uuid;
+  document.getElementById('node-title').value    = node.title || '';
+  document.getElementById('node-shape').value    = node.shape || 'Ball';
+  document.getElementById('node-color').value    = node.color || '#58a6ff';
+  document.getElementById('node-size').value     = node.size ?? 5;
+  document.getElementById('node-opacity').value  = node.opacity ?? 1;
+  document.getElementById('node-notes').value    = node.notes || '';
+  document.getElementById('node-pageUrl').value  = node.pageUrl || '';
+  document.getElementById('node-imageUrl').value = node.imageUrl || '';
+  document.getElementById('node-selected').checked  = !!node.selected;
+  document.getElementById('node-collapsed').checked = !!node.collapsed;
+  document.getElementById('node-form-card').scrollIntoView({ behavior: 'smooth' });
+}
+
+function clearNodeForm() {
+  document.getElementById('node-form-title').textContent = 'New Node';
+  document.getElementById('node-uuid').value = '';
+  document.getElementById('node-title').value = '';
+  document.getElementById('node-shape').value = 'Ball';
+  document.getElementById('node-color').value = '#58a6ff';
+  document.getElementById('node-size').value = '5';
+  document.getElementById('node-opacity').value = '1';
+  document.getElementById('node-notes').value = '';
+  document.getElementById('node-pageUrl').value = '';
+  document.getElementById('node-imageUrl').value = '';
+  document.getElementById('node-selected').checked = false;
+  document.getElementById('node-collapsed').checked = false;
+}
+
+async function submitNodeForm() {
+  const props = {
+    title:     document.getElementById('node-title').value,
+    shape:     document.getElementById('node-shape').value,
+    color:     document.getElementById('node-color').value,
+    size:      Number(document.getElementById('node-size').value),
+    opacity:   Number(document.getElementById('node-opacity').value),
+    notes:     document.getElementById('node-notes').value,
+    pageUrl:   document.getElementById('node-pageUrl').value || undefined,
+    imageUrl:  document.getElementById('node-imageUrl').value || undefined,
+    selected:  document.getElementById('node-selected').checked,
+    collapsed: document.getElementById('node-collapsed').checked,
+  };
+  const uuid = document.getElementById('node-uuid').value;
+  if (uuid) {
+    await nodaUpdateNode({ uuid, ...props });
+  } else {
+    await nodaCreateNode(props);
+  }
+  clearNodeForm();
+  await refreshNodesTable();
+}
+
+async function deleteNodeById(uuid) {
+  if (!confirm(`Delete node ${uuid}?`)) return;
+  await nodaDeleteNode(uuid);
+}
+
+// ════════════════════════════════════════════════════════
+//  LINKS TABLE
+// ════════════════════════════════════════════════════════
+async function refreshLinksTable() {
+  if (!window.noda) return;
+  try {
+    const links = await nodaListLinks();
+    linksCache = links || [];
+    renderLinksTable(linksCache);
+  } catch (e) { console.error(e); }
+}
+
+function renderLinksTable(links) {
+  const tbody = document.getElementById('links-tbody');
+  document.getElementById('link-count').textContent = links.length;
+  if (!links.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="no-data">No links yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = links.map(l => {
+    const fromNode = nodesCache.find(n => n.uuid === l.fromUuid);
+    const toNode   = nodesCache.find(n => n.uuid === l.toUuid);
+    return `
+    <tr id="link-row-${l.uuid}">
+      <td class="uuid-cell" title="${l.uuid}">${l.uuid}</td>
+      <td title="${l.fromUuid}">${esc(fromNode?.title || l.fromUuid || '')}</td>
+      <td title="${l.toUuid}">${esc(toNode?.title || l.toUuid || '')}</td>
+      <td>${esc(l.title || '')}</td>
+      <td>${esc(l.shape || '')}</td>
+      <td>${l.size ?? ''}</td>
+      <td class="actions-cell">
+        <div class="row-actions">
+          <button class="btn btn-ghost btn-sm" onclick="editLink('${l.uuid}')">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteLinkById('${l.uuid}')">Del</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function upsertLinkRow(link) {
+  const idx = linksCache.findIndex(l => l.uuid === link.uuid);
+  if (idx >= 0) linksCache[idx] = link; else linksCache.push(link);
+  renderLinksTable(linksCache);
+}
+function removeLinkRow(uuid) {
+  linksCache = linksCache.filter(l => l.uuid !== uuid);
+  renderLinksTable(linksCache);
+}
+
+function editLink(uuid) {
+  const link = linksCache.find(l => l.uuid === uuid);
+  if (!link) return;
+  switchTab('links');
+  document.getElementById('link-form-title').textContent = 'Edit Link';
+  document.getElementById('link-uuid').value  = link.uuid;
+  document.getElementById('link-from').value  = link.fromUuid || '';
+  document.getElementById('link-to').value    = link.toUuid || '';
+  document.getElementById('link-title').value = link.title || '';
+  document.getElementById('link-color').value = link.color || '#58a6ff';
+  document.getElementById('link-shape').value = link.shape || 'Solid';
+  document.getElementById('link-size').value  = link.size ?? 1;
+  document.getElementById('link-curve').value = link.curve || 'none';
+  document.getElementById('link-trail').value = link.trail || 'none';
+}
+
+function clearLinkForm() {
+  document.getElementById('link-form-title').textContent = 'New Link';
+  document.getElementById('link-uuid').value = '';
+  document.getElementById('link-from').value = '';
+  document.getElementById('link-to').value = '';
+  document.getElementById('link-title').value = '';
+  document.getElementById('link-color').value = '#58a6ff';
+  document.getElementById('link-shape').value = 'Solid';
+  document.getElementById('link-size').value = '1';
+  document.getElementById('link-curve').value = 'none';
+  document.getElementById('link-trail').value = 'none';
+}
+
+async function submitLinkForm() {
+  const props = {
+    fromUuid: document.getElementById('link-from').value,
+    toUuid:   document.getElementById('link-to').value,
+    title:    document.getElementById('link-title').value,
+    color:    document.getElementById('link-color').value,
+    shape:    document.getElementById('link-shape').value,
+    size:     Number(document.getElementById('link-size').value),
+    curve:    document.getElementById('link-curve').value,
+    trail:    document.getElementById('link-trail').value,
+  };
+  const uuid = document.getElementById('link-uuid').value;
+  if (uuid) {
+    await nodaUpdateLink({ uuid, ...props });
+  } else {
+    await nodaCreateLink(props);
+  }
+  clearLinkForm();
+  await refreshLinksTable();
+}
+
+async function deleteLinkById(uuid) {
+  if (!confirm(`Delete link ${uuid}?`)) return;
+  await nodaDeleteLink(uuid);
+}
+
+// ════════════════════════════════════════════════════════
+//  TABS
+// ════════════════════════════════════════════════════════
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    const names = ['settings','nodes','links','sync'];
+    b.classList.toggle('active', names[i] === name);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.add('active');
+}
+
+// ════════════════════════════════════════════════════════
+//  CLICKUP API CLIENT
+// ════════════════════════════════════════════════════════
+const CU_BASE = 'https://api.clickup.com/api/v2';
+
+function cuToken() { return localStorage.getItem('clickup_token') || ''; }
+
+async function cuFetch(path, options = {}) {
+  const token = cuToken();
+  if (!token) throw new Error('No ClickUp API token set');
+  const res = await fetch(`${CU_BASE}${path}`, {
+    ...options,
+    headers: {
+      'Authorization': token,
+      'Content-Type': 'application/json',
+      ...(options.headers || {})
+    }
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`ClickUp ${res.status}: ${text}`);
+  }
+  return res.json();
+}
+
+async function cuGetTeams()           { return cuFetch('/team'); }
+async function cuGetSpaces(teamId)    { return cuFetch(`/team/${teamId}/space?archived=false`); }
+async function cuGetFolders(spaceId)  { return cuFetch(`/space/${spaceId}/folder?archived=false`); }
+async function cuGetLists(folderId)   { return cuFetch(`/folder/${folderId}/list?archived=false`); }
+async function cuGetFolderlessLists(spaceId) { return cuFetch(`/space/${spaceId}/list?archived=false`); }
+async function cuGetTasks(listId)     { return cuFetch(`/list/${listId}/task?include_closed=true`); }
+async function cuUpdateTask(taskId, body) { return cuFetch(`/task/${taskId}`, { method: 'PUT', body: JSON.stringify(body) }); }
+
+// ── Settings: load workspaces / spaces ──────────────────
+async function saveToken() {
+  const token = document.getElementById('cu-token').value.trim();
+  if (!token) return alert('Enter a ClickUp API token first');
+  localStorage.setItem('clickup_token', token);
+  try {
+    const data = await cuGetTeams();
+    const teamSel = document.getElementById('cu-team');
+    teamSel.innerHTML = '<option value="">— select —</option>' +
+      data.teams.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('');
+    appendLog('Workspaces loaded', 'ok');
+  } catch (e) { appendLog(e.message, 'err'); }
+}
+
+async function loadSpaces() {
+  const teamId = document.getElementById('cu-team').value;
+  if (!teamId) return;
+  localStorage.setItem('clickup_team', teamId);
+  try {
+    const data = await cuGetSpaces(teamId);
+    const spaceSel = document.getElementById('cu-space');
+    spaceSel.innerHTML = '<option value="">— select —</option>' +
+      data.spaces.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
+    appendLog('Spaces loaded', 'ok');
+  } catch (e) { appendLog(e.message, 'err'); }
+}
+
+// ── On page load: restore settings ──────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  const token = localStorage.getItem('clickup_token');
+  if (token) document.getElementById('cu-token').value = token;
+  // restore auto-sync state
+  const autoOn = localStorage.getItem('auto_sync') === 'true';
+  document.getElementById('auto-sync-toggle').checked = autoOn;
+  const interval = localStorage.getItem('sync_interval') || '60000';
+  document.getElementById('sync-interval').value = interval;
+});
+
+// ════════════════════════════════════════════════════════
+//  CLICKUP SYNC
+// ════════════════════════════════════════════════════════
+
+// ── Transformation Scaffold ──────────────────────────────
+// Phase 2: Replace these with the user-provided mapping document.
+
+function clickupTaskToNodaNode(task, listName, folderName) {
+  return {
+    title:   task.name,
+    notes:   [
+      task.description ? task.description.substring(0, 300) : '',
+      `[ClickUp ID: ${task.id}]`
+    ].filter(Boolean).join('\n'),
+    color:   statusToColor(task.status?.status),
+    shape:   priorityToShape(task.priority?.priority),
+    size:    5,
+    pageUrl: task.url,
+    // Store ClickUp task ID for reverse sync
+    // We embed it in notes for now; Phase 2 may use a dedicated field
+  };
+}
+
+function nodaNodeToClickupTask(node) {
+  return {
+    name:        node.title,
+    description: extractDescription(node.notes),
+  };
+}
+
+// ── Helper mappers (Phase 2: replace with real mappings) ─
+function statusToColor(status) {
+  const map = {
+    'to do':        '#8b949e',
+    'in progress':  '#58a6ff',
+    'done':         '#3fb950',
+    'closed':       '#3fb950',
+    'complete':     '#3fb950',
+    'blocked':      '#f85149',
+  };
+  return map[(status || '').toLowerCase()] || '#58a6ff';
+}
+
+function priorityToShape(priority) {
+  const map = { urgent: 'Star', high: 'Diamond', normal: 'Ball', low: 'Box' };
+  return map[(priority || '').toLowerCase()] || 'Ball';
+}
+
+function extractDescription(notes) {
+  if (!notes) return '';
+  return notes.replace(/\[ClickUp ID:.*?\]/g, '').trim();
+}
+
+function extractClickUpId(notes) {
+  const m = (notes || '').match(/\[ClickUp ID: (\S+)\]/);
+  return m ? m[1] : null;
+}
+
+// ── Fetch hierarchy from ClickUp ────────────────────────
+async function fetchFromClickUp() {
+  const spaceId = document.getElementById('cu-space').value;
+  if (!spaceId) { alert('Select a Space in Settings first'); switchTab('settings'); return; }
+  setSyncStatus('Fetching from ClickUp…');
+  try {
+    const [foldersData, folderlessData] = await Promise.all([
+      cuGetFolders(spaceId),
+      cuGetFolderlessLists(spaceId)
+    ]);
+
+    cuHierarchy = { folders: [], folderlessLists: [] };
+
+    for (const folder of foldersData.folders) {
+      const listsData = await cuGetLists(folder.id);
+      const lists = [];
+      for (const list of listsData.lists) {
+        const tasksData = await cuGetTasks(list.id);
+        lists.push({ ...list, tasks: tasksData.tasks || [] });
+      }
+      cuHierarchy.folders.push({ ...folder, lists });
+    }
+
+    for (const list of folderlessData.lists) {
+      const tasksData = await cuGetTasks(list.id);
+      cuHierarchy.folderlessLists.push({ ...list, tasks: tasksData.tasks || [] });
+    }
+
+    renderHierarchyTree(cuHierarchy);
+    const taskCount = countTasks(cuHierarchy);
+    appendLog(`Fetched ${taskCount} tasks from ClickUp`, 'ok');
+    setSyncStatus(`Ready — ${taskCount} tasks fetched`);
+  } catch (e) {
+    appendLog(e.message, 'err');
+    setSyncStatus('Error: ' + e.message);
+  }
+}
+
+function countTasks(h) {
+  let n = 0;
+  h.folders.forEach(f => f.lists.forEach(l => n += l.tasks.length));
+  h.folderlessLists.forEach(l => n += l.tasks.length);
+  return n;
+}
+
+// ── Push ClickUp data to NODA ────────────────────────────
+async function pushToNoda() {
+  if (!cuHierarchy) { alert('Fetch from ClickUp first'); return; }
+  if (!window.noda) { alert('Not connected to NODA'); return; }
+  setSyncStatus('Pushing to NODA…');
+  let created = 0, skipped = 0;
+  try {
+    const existing = await nodaListNodes();
+    const existingIds = new Set(
+      existing.map(n => extractClickUpId(n.notes)).filter(Boolean)
+    );
+
+    async function processTasks(tasks, listName, folderName) {
+      for (const task of tasks) {
+        if (existingIds.has(task.id)) { skipped++; continue; }
+        const props = clickupTaskToNodaNode(task, listName, folderName);
+        await nodaCreateNode(props);
+        created++;
+      }
+    }
+
+    for (const folder of cuHierarchy.folders) {
+      for (const list of folder.lists) {
+        await processTasks(list.tasks, list.name, folder.name);
+      }
+    }
+    for (const list of cuHierarchy.folderlessLists) {
+      await processTasks(list.tasks, list.name, '');
+    }
+
+    await refreshNodesTable();
+    appendLog(`Pushed to NODA: ${created} created, ${skipped} skipped (already exist)`, 'ok');
+    setSyncStatus(`Done — ${created} nodes created`);
+  } catch (e) {
+    appendLog(e.message, 'err');
+    setSyncStatus('Error: ' + e.message);
+  }
+}
+
+// ── Push NODA changes back to ClickUp ───────────────────
+async function pushToClickUp() {
+  if (!window.noda) { alert('Not connected to NODA'); return; }
+  setSyncStatus('Pushing to ClickUp…');
+  let updated = 0, skipped = 0;
+  try {
+    const nodes = await nodaListNodes();
+    for (const node of nodes) {
+      const taskId = extractClickUpId(node.notes);
+      if (!taskId) { skipped++; continue; }
+      const body = nodaNodeToClickupTask(node);
+      await cuUpdateTask(taskId, body);
+      updated++;
+    }
+    appendLog(`Pushed to ClickUp: ${updated} tasks updated, ${skipped} nodes skipped (no ClickUp ID)`, 'ok');
+    setSyncStatus(`Done — ${updated} tasks updated`);
+  } catch (e) {
+    appendLog(e.message, 'err');
+    setSyncStatus('Error: ' + e.message);
+  }
+}
+
+// ── Auto-sync ────────────────────────────────────────────
+function toggleAutoSync() {
+  const on = document.getElementById('auto-sync-toggle').checked;
+  localStorage.setItem('auto_sync', on);
+  if (on) startAutoSync(); else stopAutoSync();
+}
+
+function startAutoSync() {
+  stopAutoSync();
+  const ms = Number(document.getElementById('sync-interval').value);
+  localStorage.setItem('sync_interval', ms);
+  autoSyncTimer = setInterval(async () => {
+    appendLog('Auto-sync triggered', 'info');
+    await fetchFromClickUp();
+    await pushToNoda();
+  }, ms);
+  document.getElementById('autosync-status').textContent =
+    `Auto-sync ON — every ${ms/1000}s`;
+}
+
+function stopAutoSync() {
+  if (autoSyncTimer) { clearInterval(autoSyncTimer); autoSyncTimer = null; }
+  document.getElementById('autosync-status').textContent = 'Auto-sync off';
+}
+
+// ════════════════════════════════════════════════════════
+//  HIERARCHY TREE RENDERER
+// ════════════════════════════════════════════════════════
+function renderHierarchyTree(h) {
+  const ul = document.getElementById('cu-tree');
+  ul.innerHTML = '';
+
+  function makeItem(label, count, children) {
+    const li = document.createElement('li');
+    const div = document.createElement('div');
+    div.className = 'tree-item';
+    div.innerHTML = `<span class="toggle">▶</span>
+      <span class="item-name">${esc(label)}</span>
+      <span class="item-count">${count}</span>`;
+    li.appendChild(div);
+    if (children.length) {
+      const sub = document.createElement('ul');
+      sub.className = 'tree tree-children';
+      children.forEach(c => sub.appendChild(c));
+      li.appendChild(sub);
+      div.onclick = () => {
+        const open = sub.classList.toggle('open');
+        div.querySelector('.toggle').textContent = open ? '▼' : '▶';
+      };
+    } else {
+      div.querySelector('.toggle').textContent = '—';
+    }
+    return li;
+  }
+
+  h.folders.forEach(folder => {
+    const listItems = folder.lists.map(list => {
+      const taskItems = list.tasks.map(task => {
+        const li = document.createElement('li');
+        const div = document.createElement('div');
+        div.className = 'tree-item';
+        div.innerHTML = `<span class="toggle">—</span>
+          <span class="item-name">${esc(task.name)}</span>
+          <span class="item-count">${esc(task.status?.status||'')}</span>`;
+        li.appendChild(div);
+        return li;
+      });
+      return makeItem(list.name, `${list.tasks.length} tasks`, taskItems);
+    });
+    ul.appendChild(makeItem(folder.name, `${folder.lists.length} lists`, listItems));
+  });
+
+  h.folderlessLists.forEach(list => {
+    const taskItems = list.tasks.map(task => {
+      const li = document.createElement('li');
+      const div = document.createElement('div');
+      div.className = 'tree-item';
+      div.innerHTML = `<span class="toggle">—</span>
+        <span class="item-name">${esc(task.name)}</span>
+        <span class="item-count">${esc(task.status?.status||'')}</span>`;
+      li.appendChild(div);
+      return li;
+    });
+    ul.appendChild(makeItem(list.name, `${list.tasks.length} tasks`, taskItems));
+  });
+}
+
+// ════════════════════════════════════════════════════════
+//  SYNC LOG
+// ════════════════════════════════════════════════════════
+function appendLog(msg, type = 'info') {
+  const log = document.getElementById('sync-log');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  const ts = new Date().toLocaleTimeString();
+  entry.innerHTML = `<span class="log-ts">${ts}</span><span class="log-${type}">${esc(msg)}</span>`;
+  log.insertBefore(entry, log.firstChild);
+  // keep max 50 entries
+  while (log.children.length > 50) log.removeChild(log.lastChild);
+}
+function clearSyncLog() { document.getElementById('sync-log').innerHTML = ''; }
+function setSyncStatus(msg) { document.getElementById('sync-status').textContent = msg; }
+
+// ════════════════════════════════════════════════════════
+//  UTILITIES
+// ════════════════════════════════════════════════════════
+function esc(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
